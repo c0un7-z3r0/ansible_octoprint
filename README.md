@@ -3,19 +3,22 @@ Role Name
 
 semuadmin.octoprint
 
-Ansible role to deploy Octoprint and/or mjpg_streamer as systemd services on Raspberry Pi
-running stock Raspberry Pi OS 32-bit Lite or Full (Lite is recommended). Should also work
-on other Debian distributions though webcam support may depend on the specific hardware.
+Ansible role to deploy OctoPrint and/or mjpg_streamer on Debian 10 (Buster, e.g. Raspbian
+lite or full) or Ubuntu 18.04 (Bionic, e.g. ArmBian).
+Should also work on other versions of mentioned distributions distributions though webcam
+support may depend on the specific hardware.
 
 By default:
-- Octoprint service will be available on: http://host_ip:5000.
+
+- the lastest version of OctoPrint will be installed
+- OctoPrint web interface will be available on: http://host_ip:5000.
 - mjpg_streamer service will be available on: http://host_ip:8080/?action=stream.
 
-(mjpg_streamer can be installed independently of Octoprint if required)
+mjpg_streamer can be installed independently of OctoPrint if required.
 
 The user will be prompted to go through the Setup Wizard on accessing the service for the
 first time, but a pre-configured config.yaml template is included with standard configuration
-items already set up. These can be amended via the Octoprint admin console.
+items already set up. These can be amended via the OctoPrint admin console.
 
 Based on instructions here:
 https://community.octoprint.org/t/setting-up-octoprint-on-a-raspberry-pi-running-raspbian/2337
@@ -43,9 +46,19 @@ Role Variables
 - `install_mjpg_streamer`: true
 - `uninstall_services` : false
 - `uninstall_dependencies` : false
+
+- `allow_usage_tracking`: true
+- `allow_error_tracking`: true
+
+- `octoprint_version`: latest
+- `latest_octoprint_url`: https://get.octoprint.org/latest
+
+- `host_ip`: "{{ ansible_default_ipv4.address }}"
 - `octoprint_user`: pi (this is the linux user under which the service runs)
 - `install_dir`: "/home/{{ octoprint_user }}"
 - `octoprint_port`: 5000
+
+- `keep_octoprint_config`: false
 
 - `webcam_user`: mjpg_streamer
 - `webcam_dir`: "{{ install_dir}}/mjpg-streamer/mjpg-streamer-experimental"
@@ -59,6 +72,8 @@ Role Variables
 See https://community.octoprint.org/t/available-mjpg-streamer-configuration-options/1106
 for available custom options.
 
+More about tracking of [the OctoPrint usage and tracking](https://tracking.octoprint.org/).
+
 Dependencies
 ------------
 
@@ -71,15 +86,15 @@ To install under Python3:
 Example Playbook
 ----------------
 
-To install Octoprint and mjpg_streamer with Raspberry Pi camera:
+To install OctoPrint and mjpg_streamer for raspberry pi camera:
 
 ```yaml
 
-    - name: Provision Octoprint and mjpg_streamer on Raspberry Pi OS
-      hosts: your_octoprint_hostname
-      remote_user: pi
+    - name: Provision OctoPrint on Raspian
+      hosts: ip_address_of_rpi
       become: true
-      
+      become_user: pi
+
       vars:
         webcam_type: raspi
 
@@ -107,7 +122,8 @@ To install just mjpg_streamer with a custom uvc camera configuration:
       hosts: your_octoprint_hostname
       remote_user: pi
       become: true
-      
+      become_user: pi
+
       vars:
         install_octoprint: false
         install_mjpg_streamer: true
@@ -126,7 +142,8 @@ To uninstall Octoprint, mjpg_streamer and all package dependencies:
       hosts: your_octoprint_hostname
       remote_user: pi
       become: true
-      
+      become_user: pi
+
       vars:
         uninstall_services: true
         uninstall_dependencies: true

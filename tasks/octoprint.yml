@@ -1,40 +1,29 @@
 ---
 # tasks file for octoprint
 
-- name: Install python dependencies.
+- name: Install octoprint dependencies.
   package:
-    name:
-      - python-pip
-      - python-dev
-      - python-setuptools
+    name: "{{ octoprint_dependencies }}"
     state: present
+    update_cache: yes
 
-- name: Install virtualenv via pip.
-  pip:
-    name:
-      - virtualenv
-    state: present
-
-- name: Install other dependencies.
-  package:
-    name:
-      - git
-      - libyaml-dev
-      - build-essential
-    state: present
-
-- name: Add octoprint user to tty and dialout groups.
+- name: Add octoprint user to required groups.
   user:
     name: "{{ octoprint_user }}"
     groups: tty, dialout, video
     append: true
+
+- name: Add sudo with no passwords rights for octoprint user
+  template:
+    src: sudo.j2
+    dest: "/etc/sudoers.d/{{ octoprint_user }}"
+    mode: 0640
 
 - name: Create octoprint directory.
   file:
     path: "{{ install_dir }}/Octoprint"
     state: directory
     owner: "{{ octoprint_user }}"
-    group: "{{ octoprint_user }}"
 
 - name: Create user config directory.
   file:
@@ -43,37 +32,55 @@
     owner: "{{ octoprint_user }}"
     group: "{{ octoprint_user }}"
 
-- name: Install octoprint via pip.
+- name: Install octoprint via pip - the latest verstion.
   pip:
-    name: "{{ octoprint_url }}"
+    name: "{{ latest_octoprint_url }}"
+    state: present
     virtualenv: "{{ install_dir }}/Octoprint/venv"
     virtualenv_command: virtualenv
+    virtualenv_python: python2
+  when: octoprint_version == 'latest'
+
+- name: Install octoprint via pip - the defined version.
+  pip:
+    name: octoprint
+    version: "{{ octoprint_version }}"
     state: present
+    virtualenv: "{{ install_dir }}/Octoprint/venv"
+    virtualenv_command: virtualenv
+    virtualenv_python: python2
+  when: octoprint_version != 'latest'
+
+- name: Check existence of config.yaml
+  stat:
+    path: "{{ install_dir }}/.octoprint/config.yaml"
+  changed_when: false
+  register: existing_config
 
 - name: Install config.yaml template.
   template:
     src: config.yaml.j2
     dest: "{{ install_dir }}/.octoprint/config.yaml"
     owner: "{{ octoprint_user }}"
-
-- name: Install init template.
-  template:
-    src: octoprint.init.j2
-    dest: /etc/init.d/octoprint
-    mode: +x
-    owner: "{{ octoprint_user }}"
+  notify:
+    - restart octoprint
+  when: not ( keep_octoprint_config | bool ) or not ( existing_config.stat.exists | bool )
 
 - name: Install default template.
   template:
     src: octoprint.default.j2
     dest: /etc/default/octoprint
     owner: "{{ octoprint_user }}"
+  notify:
+    - reload systemd
 
 - name: Install systemd service template.
   template:
     src: octoprint.service.j2
     dest: /etc/systemd/system/octoprint.service
     owner: "{{ octoprint_user }}"
+  notify:
+    - reload systemd
 
 - name: Change ownership of .octoprint directory
   file:
@@ -91,9 +98,10 @@
     owner: "{{ octoprint_user }}"
     group: "{{ octoprint_user }}"
 
-- name: Start octoprint service.
-  systemd:
+- meta: flush_handlers
+
+- name: Enable and start octoprint service.
+  service:
     name: octoprint
     enabled: true
-    state: restarted
-    daemon_reload: true
+    state: started
